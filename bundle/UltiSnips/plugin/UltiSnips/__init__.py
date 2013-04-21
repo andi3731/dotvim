@@ -546,6 +546,17 @@ class SnippetManager(object):
             self._handle_failure(self.expand_trigger)
 
     @err_to_scratch_buffer
+    def list_snippets_dict(self):
+        before, after = _vim.buf.current_line_splitted
+        snippets = self._snips(before, True)
+
+        # Sort snippets alphabetically
+        snippets.sort(key=lambda x: x.trigger)
+        for snip in snippets:
+            _vim.command("let g:current_ulti_dict['{key}'] = '{val}'".format(key=snip.trigger, val=snip.description))
+
+
+    @err_to_scratch_buffer
     def list_snippets(self):
         before, after = _vim.buf.current_line_splitted
         snippets = self._snips(before, True)
