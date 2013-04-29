@@ -1364,6 +1364,10 @@ Contributors listed in chronological order:
    Matthew Strawbridge (pxc)
    Josh Strater (jstrater)
    jinzhu
+   Rene Vergara (ravl1084)
+   Johan Haals (JHaals)
+   Danilo Bargen (dbrgn)
+   Bernhard Vallant (lazerscience)
 
 Thank you for your support.
 

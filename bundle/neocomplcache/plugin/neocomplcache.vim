@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: neocomplcache.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 21 Apr 2013.
+" Last Modified: 25 Apr 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -57,7 +57,7 @@ command! -nargs=0 -bar NeoComplCacheDisable
 command! -nargs=0 -bar NeoComplCacheLock
       \ call neocomplcache#commands#_lock()
 command! -nargs=0 -bar NeoComplCacheUnlock
-      \ call neocomplcache#unlock()
+      \ call neocomplcache#commands#_unlock()
 command! -nargs=0 -bar NeoComplCacheToggle
       \ call neocomplcache#commands#_toggle_lock()
 command! -nargs=1 -bar NeoComplCacheLockSource
@@ -144,8 +144,6 @@ let g:neocomplcache_disable_caching_file_path_pattern =
       \ get(g:, 'neocomplcache_disable_caching_file_path_pattern', '')
 let g:neocomplcache_lock_buffer_name_pattern =
       \ get(g:, 'neocomplcache_lock_buffer_name_pattern', '')
-let g:neocomplcache_compare_function =
-      \ get(g:, 'neocomplcache_compare_function', 'neocomplcache#compare_rank')
 let g:neocomplcache_ctags_program =
       \ get(g:, 'neocomplcache_ctags_program', 'ctags')
 let g:neocomplcache_force_overwrite_completefunc =

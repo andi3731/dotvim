@@ -67,6 +67,7 @@ set tags=./tags,./TAGS,tags,TAGS,../tags,../../tags
 set wildignore+=*.o,*.obj,.git,.hg,*.rbc,*.pyc,*.zip,*.gz,*.bz,*.tar
 set wildignore+=*.jpg,*.png,*.gif,*.avi,*.wmv,*.ogg,*.mp3,*.mov,*~
 set wildignore+=tags,cscope.out,*.db,*.pdf
+set wildignore+=GTAGS,GRTAGS,GPATH
 
 " Switch syntax highlighting on, when the terminal has colors
 " Also switch on highlighting the last used search pattern.
@@ -454,8 +455,11 @@ function! s:unite_my_settings()"{{{
   nmap <buffer> s jp
   nmap <buffer> S kp
 
-  " <C-l>: manual neocomplcache completion.
-  inoremap <buffer> <C-;> <C-x><C-u><C-p><Down>
+  " <C-L>: manual neocomplcache completion.
+  inoremap <buffer> <C-;> <C-X><C-U><C-P><Down>
+
+  inoremap <silent><expr><buffer> <C-X> unite#do_action('cd')
+  nnoremap <silent><expr><buffer> <C-X> unite#do_action('cd')
 
   " Start insert.
   "let g:unite_enable_start_insert = 1
@@ -481,9 +485,10 @@ function! LoadUnite() "{{{
 	\ -prompt=%\  buffer file_mru bookmark file<CR>
   nnoremap <silent> ,ur :<C-u>Unite -buffer-name=register register<CR>
   nnoremap <silent> ,uo :<C-u>Unite outline<CR>
-  nnoremap ,uf :<C-u>Unite source<CR>
-  nnoremap ,uu :<C-u>Unite source -resume<CR>
-  nnoremap ,rr :<C-u>UniteResume<CR>
+  nnoremap ,uf :<C-U>Unite source<CR>
+  nnoremap ,uu :<C-U>Unite source -resume<CR>
+  nnoremap ,rr :<C-U>UniteResume<CR>
+  nnoremap ,rd :<C-U>Unite -buffer-name=mru_folders -resume directory_mru<CR>
   "nnoremap ,uc :<C-U>Unite -buffer-name=colorscheme colorscheme<CR>
   nnoremap ,uc :<C-U>call UniteColorSchemeResume()<CR>
 
@@ -583,12 +588,13 @@ noremap ,pd :CtrlPCurWD<CR>
 noremap ,pj :CtrlPBufTagAll<CR>
 noremap ,pf :CtrlPCurFile<CR>
 noremap ,pa :CtrlPShowArr<CR>
+nnoremap ,pc :CtrlPBookmarkDir<CR>
 let g:ctrlp_prompt_mappings = {
          \ 'PrtBS()':      ['<bs>', '<c-]>', '<c-h>'],
          \ 'PrtCurLeft()': ['<left>', '<c-^>'],
          \ }
 let g:ctrlp_map = ''
-command! CtrlPShowArr call CtrlpShowArrFun()
+command! CtrlPShowArr call CtrlpShowArrFun(-1)
 function! CtrlpShowArrFun(count)
   let i = 0
   let msg = ''
@@ -603,7 +609,7 @@ function! CtrlpShowArrFun(count)
   echo msg
 endfunction
 let g:ctrlp_comm = ['', 'Buffer', 'MRUFiles', 'CurWD', 'Dir',
-      \'Root', 'Tag', 'CurFile']
+      \'Root', 'Tag', 'CurFile', 'BookmarkDir']
 nnoremap <silent> <C-P> :<C-U>call CtrlpShowArrFun(v:count)
       \ \| silent! exe 'CtrlP' . g:ctrlp_comm[v:count]<CR>
 noremap ,b :CtrlPBuffer<CR>
@@ -940,20 +946,36 @@ function! SetPdfDestination(...)
   else
     let g:fix_pdf_dest = substitute(expand('%:t'), '.tex', '', '')
   endif
+
+  "just change to the folder of the current file already. Should be there in
+  "the first place
+  silent exe "cd " . expand('%:p:h')
+  echo "changed folder to " . expand('%p:h')
+
+  if has("gui")
+    winpos 0 0
+    set guioptions-=m "no menu bar for now
+    set lines=100 columns=91
+  endif
+
   let g:did_setpdfdestination = 1
+  let g:fix_pdf_dest_target = expand('%:p:h') . '/' . g:fix_pdf_dest
   nnoremap <Leader>la :<C-U>call FixForwardSeach()<CR>
+  command! -complete=file -nargs=* CompileViewLatex
+        \ exec "!start latexmk -pvc " . g:fix_pdf_dest_target
 endfunction
 
 function! FixForwardSeach()
   if !exists("g:did_setpdfdestination")
     call SetPdfDestination()
   endif
-  let target = expand('%:p:h') . '/' . g:fix_pdf_dest . '.pdf'
-  let cmd = g:SumatraPdfLoc . " -reuse-instance -forward-search " . expand('%:p') . ' ' . line('.') . ' ' . target
+  let target = g:fix_pdf_dest_target . '.pdf'
+  let cmd = g:SumatraPdfLoc . " -reuse-instance -forward-search "
+        \ . expand('%:p') . ' ' . line('.') . ' ' . target
   let execString = 'silent! !start ' . cmd
   exe execString
 endfunction
-command! -complete=file -nargs=* FixForwardSeach call SetPdfDestination(<f-args>)
+command! -complete=file -nargs=* Mt call SetPdfDestination(<f-args>)
 "==============================================================================}}}
 
 "================== Other commands/mappings/settings =========================={{{

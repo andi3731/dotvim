@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: init.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 19 Apr 2013.
+" Last Modified: 26 Apr 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -60,6 +60,7 @@ function! neocomplcache#init#enable() "{{{
 
   call neocomplcache#init#_sources(get(g:neocomplcache_sources_list,
         \ neocomplcache#get_context_filetype(), ['_']))
+  let s:is_enabled = 1
 endfunction"}}}
 
 function! neocomplcache#init#disable() "{{{
@@ -77,22 +78,9 @@ function! neocomplcache#init#disable() "{{{
 
   delcommand NeoComplCacheDisable
 
-  for source in values(neocomplcache#available_sources())
-    if !has_key(source, 'finalize') || !source.loaded
-      continue
-    endif
-
-    try
-      call source.finalize()
-    catch
-      call neocomplcache#print_error(v:throwpoint)
-      call neocomplcache#print_error(v:exception)
-      call neocomplcache#print_error(
-            \ 'Error occured in source''s finalize()!')
-      call neocomplcache#print_error(
-            \ 'Source name is ' . source.name)
-    endtry
-  endfor
+  call neocomplcache#helper#call_hook(filter(values(
+        \ neocomplcache#variables#get_sources()), 'v:val.loaded'),
+        \ 'on_final', {})
 endfunction"}}}
 
 function! neocomplcache#init#is_enabled() "{{{
@@ -643,6 +631,12 @@ endfunction"}}}
 
 function! neocomplcache#init#_current_neocomplcache() "{{{
   let b:neocomplcache = {
+        \ 'context' : {
+        \      'input' : '',
+        \      'complete_pos' : -1,
+        \      'complete_str' : '',
+        \      'candidates' : [],
+        \ },
         \ 'lock' : 0,
         \ 'skip_next_complete' : 0,
         \ 'filetype' : '',
@@ -657,15 +651,15 @@ function! neocomplcache#init#_current_neocomplcache() "{{{
         \ 'event' : '',
         \ 'cur_text' : '',
         \ 'old_cur_text' : '',
-        \ 'cur_keyword_str' : '',
-        \ 'cur_keyword_pos' : -1,
-        \ 'complete_words' : [],
-        \ 'complete_results' : {},
+        \ 'complete_str' : '',
+        \ 'complete_pos' : -1,
+        \ 'candidates' : [],
+        \ 'complete_results' : [],
         \ 'start_time' : reltime(),
         \}
 endfunction"}}}
 
-function! neocomplcache#init#_sources(source_names) "{{{
+function! neocomplcache#init#_sources(names) "{{{
   if !exists('s:loaded_source_files')
     " Initialize.
     let s:loaded_source_files = {}
@@ -684,11 +678,7 @@ function! neocomplcache#init#_sources(source_names) "{{{
         \ 'index(runtimepath_save, v:val) < 0'))
   let sources = neocomplcache#variables#get_sources()
 
-  for name in a:source_names
-    if has_key(sources, name)
-      continue
-    endif
-
+  for name in filter(copy(a:names), '!has_key(sources, v:val)')
     " Search autoload.
     for source_name in map(split(globpath(runtimepath,
           \ 'autoload/neocomplcache/sources/*.vim'), '\n'),
@@ -716,18 +706,32 @@ function! neocomplcache#init#_sources(source_names) "{{{
 endfunction"}}}
 
 function! neocomplcache#init#_source(source) "{{{
-  let default_source = {
+  let default = {
         \ 'filetypes' : {},
         \ 'hooks' : {},
+        \ 'matchers' : ['matcher_old'],
+        \ 'sorters' : ['sorter_rank'],
+        \ 'converters' : [
+        \      'converter_remove_next_keyword',
+        \      'converter_delimiter',
+        \      'converter_case',
+        \      'converter_abbr',
+        \ ],
+        \ 'neocomplcache__context' : copy(neocomplcache#get_context()),
         \ }
 
-  let source = extend(default_source, a:source)
+  let source = extend(default, a:source)
 
   let source.loaded = 0
   " Source kind convertion.
-  if source.kind ==# 'plugin'
+  if source.kind ==# 'plugin' ||
+        \ (!has_key(source, 'gather_candidates') &&
+        \  !has_key(source, 'get_complete_words'))
     let source.kind = 'keyword'
   elseif source.kind ==# 'ftplugin' || source.kind ==# 'complfunc'
+    " For compatibility.
+    let source.kind = 'manual'
+  else
     let source.kind = 'manual'
   endif
 
@@ -743,6 +747,9 @@ function! neocomplcache#init#_source(source) "{{{
           \ g:neocomplcache_auto_completion_start_length : 0
   endif
 
+  let source.neocomplcache__context.source_name = source.name
+
+  " Note: This routine is for compatibility of old sources implementation.
   " Initialize sources.
   if empty(source.filetypes) && has_key(source, 'initialize')
     try
@@ -760,6 +767,57 @@ function! neocomplcache#init#_source(source) "{{{
   endif
 
   return source
+endfunction"}}}
+
+function! neocomplcache#init#_filters(names) "{{{
+  let _ = []
+  let filters = neocomplcache#variables#get_filters()
+
+  for name in a:names
+    if !has_key(filters, name)
+      " Search autoload.
+      for filter_name in map(split(globpath(&runtimepath,
+            \ 'autoload/neocomplcache/filters/'.
+            \   substitute(name,
+            \'^\%(matcher\|sorter\|converter\)_[^/_-]\+\zs[/_-].*$', '', '')
+            \  .'*.vim'), '\n'), "fnamemodify(v:val, ':t:r')")
+        let filter = neocomplcache#filters#{filter_name}#define()
+        if empty(filter)
+          " Ignore.
+          continue
+        endif
+
+        call neocomplcache#define_filter(filter)
+      endfor
+
+      if !has_key(filters, name)
+        " Not found.
+        call neocomplcache#print_error(
+              \ printf('filter name : %s is not found.', string(name)))
+        continue
+      endif
+    endif
+
+    if has_key(filters, name)
+      call add(_, filters[name])
+    endif
+  endfor
+
+  return _
+endfunction"}}}
+
+function! neocomplcache#init#_filter(filter) "{{{
+  let default = {
+        \ }
+
+  let filter = extend(default, a:filter)
+  if !has_key(filter, 'kind')
+    let filter.kind =
+          \ (filter.name =~# '^matcher_') ? 'matcher' :
+          \ (filter.name =~# '^sorter_') ? 'sorter' : 'converter'
+  endif
+
+  return filter
 endfunction"}}}
 
 let &cpo = s:save_cpo
