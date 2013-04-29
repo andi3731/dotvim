@@ -555,7 +555,6 @@ class SnippetManager(object):
         for snip in snippets:
             _vim.command("let g:current_ulti_dict['{key}'] = '{val}'".format(key=snip.trigger, val=snip.description))
 
-
     @err_to_scratch_buffer
     def list_snippets(self):
         before, after = _vim.buf.current_line_splitted

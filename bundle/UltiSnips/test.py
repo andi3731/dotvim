@@ -2988,6 +2988,14 @@ class DeleteCurrentTabStop3_JumpAround(_VimTest):
     wanted = "hello\nendworld"
 
 # End: Normal mode editing  #}}}
+
+class VerifyVimDict1(_VimTest):
+
+    snippets = ('test', 'abc123')
+    keys = 'test=(type(UltiSnips_SnippetDict()) . len(UltiSnips_SnippetDict()))\n'
+
+    wanted = 'test41'
+
 ###########################################################################
 #                               END OF TEST                               #
 ###########################################################################
