@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: mappings.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 28 Apr 2013.
+" Last Modified: 17 May 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -95,8 +95,8 @@ function! unite#mappings#define_default_mappings() "{{{
         \ :<C-u>call <SID>narrowing_input_history()<CR>
   nnoremap <buffer><silent> <Plug>(unite_narrowing_dot)
         \ :<C-u>call <SID>narrowing_dot()<CR>
-  nnoremap <buffer><silent> <Plug>(unite_toggle_max_candidates)
-        \ :<C-u>call <SID>toggle_max_candidates()<CR>
+  nnoremap <buffer><silent> <Plug>(unite_disable_max_candidates)
+        \ :<C-u>call <SID>disable_max_candidates()<CR>
   nnoremap <buffer><silent> <Plug>(unite_quick_help)
         \ :<C-u>call <SID>quick_help()<CR>
   nnoremap <buffer><silent> <Plug>(unite_new_candidate)
@@ -114,16 +114,15 @@ function! unite#mappings#define_default_mappings() "{{{
         \ (unite#get_current_unite().prompt_linenr+1)."G" : "")
         \ . ":call unite#redraw()\<CR>"
   inoremap <silent><expr><buffer> <Plug>(unite_delete_backward_char)
-        \ col('.') <= (len(unite#get_current_unite().prompt)+1) ?
-        \ "\<C-o>:\<C-u>call \<SID>all_exit()\<CR>" : "\<C-h>"
-  inoremap <expr><buffer> <Plug>(unite_delete_backward_line)
+        \ <SID>smart_imap("\<C-o>:\<C-u>call \<SID>all_exit()\<CR>",
+        \ (unite#get_input() == '' ?
+        \ "\<C-o>:\<C-u>call \<SID>all_exit()\<CR>" : "\<C-h>"))
+  inoremap <silent><expr><buffer> <Plug>(unite_delete_backward_line)
         \ <SID>smart_imap('', repeat("\<C-h>",
         \     col('.')-(len(unite#get_current_unite().prompt)+1)))
-  inoremap <expr><buffer> <Plug>(unite_delete_backward_word)
+  inoremap <silent><expr><buffer> <Plug>(unite_delete_backward_word)
         \ <SID>smart_imap('', "\<C-w>")
-  inoremap <expr><buffer> <Plug>(unite_delete_backward_path)
-        \ col('.') <= (len(unite#get_current_unite().prompt)+1) ?
-        \ "\<C-o>:\<C-u>call \<SID>exit()\<CR>" :
+  inoremap <silent><expr><buffer> <Plug>(unite_delete_backward_path)
         \ <SID>smart_imap('', <SID>delete_backward_path())
   inoremap <expr><buffer> <Plug>(unite_select_next_line)
         \ pumvisible() ? "\<C-n>" : <SID>loop_cursor_down(0)
@@ -159,8 +158,8 @@ function! unite#mappings#define_default_mappings() "{{{
         \ <C-o>:<C-u>call <SID>narrowing_path()<CR>
   inoremap <silent><buffer> <Plug>(unite_narrowing_input_history)
         \ <C-o>:<C-u>call <SID>narrowing_input_history()<CR>
-  inoremap <silent><buffer> <Plug>(unite_toggle_max_candidates)
-        \ <C-o>:<C-u>call <SID>toggle_max_candidates()<CR>
+  inoremap <silent><buffer> <Plug>(unite_disable_max_candidates)
+        \ <C-o>:<C-u>call <SID>disable_max_candidates()<CR>
   inoremap <silent><buffer> <Plug>(unite_redraw)
         \ <C-o>:<C-u>call <SID>redraw()<CR>
   inoremap <buffer><silent> <Plug>(unite_new_candidate)
@@ -198,7 +197,7 @@ function! unite#mappings#define_default_mappings() "{{{
   nmap <buffer> <C-h>     <Plug>(unite_delete_backward_path)
   nmap <buffer> <C-r>     <Plug>(unite_restart)
   nmap <buffer> *         <Plug>(unite_toggle_mark_all_candidates)
-  nmap <buffer> M         <Plug>(unite_toggle_max_candidates)
+  nmap <buffer> M         <Plug>(unite_disable_max_candidates)
   nmap <buffer> ?         <Plug>(unite_quick_help)
   nmap <buffer> N         <Plug>(unite_new_candidate)
   nmap <buffer> .         <Plug>(unite_narrowing_dot)
@@ -291,10 +290,11 @@ function! unite#mappings#narrowing(word) "{{{
   let prompt_linenr = unite.prompt_linenr
   call setline(prompt_linenr, unite.prompt . unite.input)
   call unite#redraw()
-  execute prompt_linenr
   if unite.is_insert
+    call cursor(prompt_linenr, 0)
     startinsert!
   else
+    call cursor(prompt_linenr+1, 0)
     normal! 0z.
   endif
 endfunction"}}}
@@ -318,10 +318,8 @@ function! unite#mappings#do_action(action_name, ...) "{{{
     let candidates = [ unite#get_current_candidate() ]
   endif
 
-  let is_clear_marks = !empty(unite#get_marked_candidates())
-
   let candidates = filter(copy(candidates),
-        \ '!has_key(v:val, "is_dummy") || !v:val.is_dummy')
+        \ "!empty(v:val) && !get(v:val, 'is_dummy', 0)")
   if empty(candidates)
     return []
   endif
@@ -340,17 +338,22 @@ function! unite#mappings#do_action(action_name, ...) "{{{
   let context = unite#get_context()
 
   " Execute action.
-  let is_redraw = 0
   let is_quit = 0
+  let is_redraw = 0
   let _ = []
   for table in action_tables
     " Check quit flag.
     if table.action.is_quit && unite.profile_name !=# 'action'
+          \ && !table.action.is_start
       call unite#all_quit_session(0)
       let is_quit = 1
     endif
 
-    if table.action.is_selectable && is_clear_marks
+    if table.action.is_start && !empty(unite#get_marked_candidates())
+      call s:clear_marks(candidates)
+      call unite#force_redraw()
+      let is_redraw = 0
+    elseif table.action.is_selectable
       let is_redraw = 1
     endif
 
@@ -399,14 +402,8 @@ function! unite#mappings#do_action(action_name, ...) "{{{
   endif
 
   if !is_quit && is_redraw
+    call s:clear_marks(candidates)
     call unite#force_redraw()
-
-    if is_clear_marks
-      " Clear marks.
-      for candidate in candidates
-        let candidate.unite__is_marked = 0
-      endfor
-    endif
   endif
 
   return _
@@ -514,8 +511,9 @@ function! s:delete_backward_path() "{{{
         \      getline('.') :
         \      matchstr(getline('.'),
         \         '^.*\%' . col('.') . 'c' . (mode() ==# 'i' ? '' : '.'))
-  return repeat("\<C-h>", unite#util#strchars(
-        \ cur_text[len(unite#get_context().prompt):]))
+  let path = matchstr(cur_text[
+        \ len(unite#get_context().prompt):], '[^/]*.$')
+  return repeat("\<C-h>", unite#util#strchars(path))
 endfunction"}}}
 function! s:normal_delete_backward_path() "{{{
   let modifiable_save = &l:modifiable
@@ -609,6 +607,7 @@ function! unite#mappings#_choose_action(candidates, ...) "{{{
   let context.source__sources = unite.sources
   let context.buffer_name = 'action'
   let context.profile_name = 'action'
+  let context.start_insert = 1
 
   call call((has_key(context, 'vimfiler__current_directory') ?
         \ 'unite#start' : 'unite#start_temporary'),
@@ -904,15 +903,7 @@ function! s:toggle_auto_highlight() "{{{
   let context = unite#get_context()
   let context.auto_highlight = !context.auto_highlight
 endfunction"}}}
-function! s:toggle_max_candidates() "{{{
-  let unite = unite#get_current_unite()
-  let unite.is_enabled_max_candidates = !unite.is_enabled_max_candidates
-  if unite.is_enabled_max_candidates
-    echo 'Enabled max candidates.'
-  else
-    echo 'Disabled max candidates.'
-  endif
-
+function! s:disable_max_candidates() "{{{
   call unite#force_redraw()
   call s:redraw_all_candidates()
 endfunction"}}}
@@ -940,6 +931,11 @@ function! s:redraw_all_candidates() "{{{
 endfunction"}}}
 function! s:narrowing_dot() "{{{
   call unite#mappings#narrowing(unite#get_input().'.')
+endfunction"}}}
+function! s:clear_marks(candidates) "{{{
+  for candidate in a:candidates
+    let candidate.unite__is_marked = 0
+  endfor
 endfunction"}}}
 
 function! s:get_quick_match_table() "{{{

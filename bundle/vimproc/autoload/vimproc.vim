@@ -2,7 +2,7 @@
 " FILE: vimproc.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com> (Modified)
 "          Yukihiro Nakadaira <yukihiro.nakadaira at gmail.com> (Original)
-" Last Modified: 21 Apr 2013.
+" Last Modified: 23 May 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -561,11 +561,11 @@ function! s:plineopen(npipe, commands, is_pty) "{{{
   let proc.pid_list = pid_list
   let proc.pid = pid_list[-1]
   let proc.stdin = s:fdopen_pipes(stdin_list,
-        \ 'vp_pipes_front_close', 'read_pipes', 'write_pipes')
+        \ 'vp_pipes_close', 'read_pipes', 'write_pipes')
   let proc.stdout = s:fdopen_pipes(stdout_list,
-        \ 'vp_pipes_back_close', 'read_pipes', 'write_pipes')
+        \ 'vp_pipes_close', 'read_pipes', 'write_pipes')
   let proc.stderr = s:fdopen_pipes(stderr_list,
-        \ 'vp_pipes_back_close', 'read_pipes', 'write_pipes')
+        \ 'vp_pipes_close', 'read_pipes', 'write_pipes')
   let proc.get_winsize = s:funcref('vp_get_winsize')
   let proc.set_winsize = s:funcref('vp_set_winsize')
   let proc.kill = s:funcref('vp_kill')
@@ -633,6 +633,10 @@ function! s:pgroup_open(statements, is_pty, npipe) "{{{
   let proc.waitpid = s:funcref('vp_pgroup_waitpid')
   let proc.is_valid = 1
   let proc.is_pty = 0
+  " echomsg expand('<sfile>')
+  " echomsg 'open:' string(map(copy(proc.current_proc.stdin.fd), 'v:val.fd'))
+  " echomsg 'open:' string(map(copy(proc.current_proc.stdout.fd), 'v:val.fd'))
+  " echomsg 'open:' string(map(copy(proc.current_proc.stderr.fd), 'v:val.fd'))
 
   return proc
 endfunction"}}}
@@ -661,7 +665,7 @@ function! vimproc#kill(pid, sig) "{{{
   try
     call s:libcall('vp_kill', [a:pid, a:sig])
   catch /kill() error:/
-    let s:last_errmsg = v:errmsg
+    let s:last_errmsg = v:exception
     return 1
   endtry
 
@@ -785,7 +789,11 @@ function! vimproc#readdir(dirname) "{{{
   let dirname = vimproc#util#iconv(dirname, &encoding,
         \ vimproc#util#termencoding())
 
-  let files = s:libcall('vp_readdir', [dirname])
+  try
+    let files = s:libcall('vp_readdir', [dirname])
+  catch /vp_readdir/
+    return []
+  endtry
 
   call map(files, 'vimproc#util#iconv(
         \ v:val, vimproc#util#termencoding(), &encoding)')
@@ -802,6 +810,8 @@ function! vimproc#delete_trash(filename) "{{{
     return
   endif
 
+  let filename = a:filename
+
   " Delete last /.
   if filename =~ '[^:]/$'
     " Delete last /.
@@ -810,7 +820,7 @@ function! vimproc#delete_trash(filename) "{{{
 
   " Substitute path separator to "/".
   let filename = substitute(
-        \ fnamemodify(a:filename, ':p'), '/', '\\', 'g')
+        \ fnamemodify(filename, ':p'), '/', '\\', 'g')
 
   " Encoding conversion.
   let filename = vimproc#util#iconv(filename,
@@ -850,7 +860,6 @@ function! s:close() dict "{{{
   let self.is_valid = 0
   let self.eof = 1
   let self.__eof = 1
-  let self.fd = -1
 endfunction"}}}
 function! s:read(...) dict "{{{
   if self.__eof
@@ -969,7 +978,7 @@ function! s:garbage_collect() "{{{
         endif
         call remove(s:bg_processes, pid)
       endif
-    catch /waitpid() error:/
+    catch /waitpid() error:\|vp_waitpid:/
       " Ignore error.
     endtry
   endfor
@@ -1182,18 +1191,21 @@ function! s:vp_pipe_open(npipe, hstdin, hstdout, hstderr, argv) "{{{
 endfunction"}}}
 
 function! s:vp_pipe_close() dict
+  " echomsg 'close:'.self.fd
   if self.fd != 0
     call s:libcall('vp_pipe_close', [self.fd])
     let self.fd = 0
   endif
 endfunction
 
-function! s:vp_pipes_front_close() dict
-  call self.fd[0].close()
-endfunction
-
-function! s:vp_pipes_back_close() dict
-  call self.fd[-1].close()
+function! s:vp_pipes_close() dict
+  for fd in self.fd
+    try
+      call fd.close()
+    catch /vimproc: vp_pipe_close: /
+      " Ignore error.
+    endtry
+  endfor
 endfunction
 
 function! s:vp_pgroup_close() dict
@@ -1423,7 +1435,7 @@ function! s:vp_checkpid() dict
     if cond !=# 'run'
       let [self.cond, self.status] = [cond, status]
     endif
-  catch /waitpid() error:/
+  catch /waitpid() error:\|vp_waitpid:/
     let [cond, status] = ['error', '0']
   endtry
 
@@ -1456,6 +1468,10 @@ function! s:vp_waitpid() dict
 endfunction
 
 function! s:vp_pgroup_waitpid() dict
+  call s:close_all(self)
+
+  let self.is_valid = 0
+
   if !has_key(self, 'cond') ||
         \ !has_key(self, 'status')
     return s:waitpid(self.pid)

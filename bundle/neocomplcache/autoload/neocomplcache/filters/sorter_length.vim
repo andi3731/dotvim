@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: file_mru.vim
+" FILE: sorter_length.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 05 Oct 2010
+" Last Modified: 09 May 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,24 +24,31 @@
 " }}}
 "=============================================================================
 
-if exists('g:loaded_unite_source_file_mru')
-      \ || $SUDO_USER != ''
-  finish
-endif
-
 let s:save_cpo = &cpo
 set cpo&vim
 
-augroup plugin-unite-source-file_mru
-  autocmd!
-  autocmd BufEnter,BufWinEnter,BufFilePost,BufWritePost *
-        \ call unite#sources#file_mru#_append()
-augroup END
+function! neocomplcache#filters#sorter_length#define() "{{{
+  return s:sorter
+endfunction"}}}
 
-let g:loaded_unite_source_file_mru = 1
+let s:sorter = {
+      \ 'name' : 'sorter_length',
+      \ 'description' : 'sort by length order',
+      \}
+
+function! s:sorter.filter(context) "{{{
+  return sort(a:context.candidates, 's:compare')
+endfunction"}}}
+
+function! s:compare(i1, i2)
+  let diff = len(a:i1.word) - len(a:i2.word)
+  if !diff
+    let diff = (a:i1.word ># a:i2.word) ? 1 : -1
+  endif
+  return diff
+endfunction
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
 
-" __END__
 " vim: foldmethod=marker

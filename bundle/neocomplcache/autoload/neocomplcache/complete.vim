@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: complete.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 26 Apr 2013.
+" Last Modified: 19 May 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -98,14 +98,9 @@ function! neocomplcache#complete#sources_manual_complete(findstart, base) "{{{
       return -2
     endif
 
-    let all_sources = neocomplcache#available_sources()
-    let sources = get(a:000, 0, keys(all_sources))
-    let s:use_sources = neocomplcache#helper#get_sources_list(
-          \ type(sources) == type([]) ? sources : [sources])
-
     " Get complete_pos.
     let complete_results = neocomplcache#complete#_get_results(
-          \ neocomplcache#get_cur_text(1), s:use_sources)
+          \ neocomplcache#get_cur_text(1), neocomplcache.manual_sources)
     let neocomplcache.complete_pos =
           \ neocomplcache#complete#_get_complete_pos(complete_results)
 
@@ -188,6 +183,9 @@ function! neocomplcache#complete#_get_words(sources, complete_pos, complete_str)
           \ deepcopy(context.candidates)
     let context.candidates = words
 
+    call neocomplcache#helper#call_hook(
+          \ source, 'on_post_filter', {})
+
     if context.complete_pos > a:complete_pos
       let prefix = a:complete_str[: context.complete_pos
             \                            - a:complete_pos - 1]
@@ -209,6 +207,10 @@ function! neocomplcache#complete#_get_words(sources, complete_pos, complete_str)
 
     let words = neocomplcache#helper#call_filters(
           \ source.sorters, source, {})
+
+    if source.max_candidates > 0
+      let words = words[: len(source.max_candidates)-1]
+    endif
 
     let words = neocomplcache#helper#call_filters(
           \ source.converters, source, {})
@@ -294,7 +296,7 @@ function! neocomplcache#complete#_set_results_pos(cur_text, ...) "{{{
             \ 'Error occured in source''s get_complete_position()!')
       call neocomplcache#print_error(
             \ 'Source name is ' . source.name)
-      return complete_results
+      return complete_sources
     finally
       if winsaveview() != pos
         call winrestview(pos)
@@ -375,8 +377,7 @@ endfunction"}}}
 
 " Source rank order. "{{{
 function! s:compare_source_rank(i1, i2)
-  return neocomplcache#get_source_rank(a:i2.name) -
-        \ neocomplcache#get_source_rank(a:i1.name)
+  return a:i2.rank - a:i1.rank
 endfunction"}}}
 
 let &cpo = s:save_cpo

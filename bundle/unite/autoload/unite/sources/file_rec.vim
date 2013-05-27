@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: file_rec.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Apr 2013.
+" Last Modified: 29 Apr 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -372,6 +372,7 @@ endfunction"}}}
 " Add custom action table. "{{{
 let s:cdable_action_rec = {
       \ 'description' : 'open this directory by file_rec source',
+      \ 'is_start' : 1,
       \}
 
 function! s:cdable_action_rec.func(candidate)
@@ -380,6 +381,7 @@ endfunction
 
 let s:cdable_action_rec_parent = {
       \ 'description' : 'open parent directory by file_rec source',
+      \ 'is_start' : 1,
       \}
 
 function! s:cdable_action_rec_parent.func(candidate)
@@ -388,8 +390,20 @@ function! s:cdable_action_rec_parent.func(candidate)
         \ ]])
 endfunction
 
+let s:cdable_action_rec_project = {
+      \ 'description' : 'open project directory by file_rec source',
+      \ 'is_start' : 1,
+      \}
+
+function! s:cdable_action_rec_project.func(candidate)
+  call unite#start_script([['file_rec', unite#util#substitute_path_separator(
+        \ unite#util#path2project_directory(a:candidate.action__directory))
+        \ ]])
+endfunction
+
 let s:cdable_action_rec_async = {
       \ 'description' : 'open this directory by file_rec/async source',
+      \ 'is_start' : 1,
       \}
 
 function! s:cdable_action_rec_async.func(candidate)
@@ -398,6 +412,7 @@ endfunction
 
 let s:cdable_action_rec_parent_async = {
       \ 'description' : 'open parent directory by file_rec/async source',
+      \ 'is_start' : 1,
       \}
 
 function! s:cdable_action_rec_parent_async.func(candidate)
@@ -406,12 +421,29 @@ function! s:cdable_action_rec_parent_async.func(candidate)
         \ ]])
 endfunction
 
+let s:cdable_action_rec_project_async = {
+      \ 'description' : 'open project directory by file_rec/async source',
+      \ 'is_start' : 1,
+      \}
+
+function! s:cdable_action_rec_project_async.func(candidate)
+  call unite#start_script([['file_rec/async', unite#util#substitute_path_separator(
+        \ unite#util#path2project_directory(a:candidate.action__directory))
+        \ ]])
+endfunction
+
 call unite#custom_action('cdable', 'rec', s:cdable_action_rec)
 call unite#custom_action('cdable', 'rec_parent', s:cdable_action_rec_parent)
+call unite#custom_action('cdable', 'rec_project', s:cdable_action_rec_project)
 call unite#custom_action('cdable', 'rec/async', s:cdable_action_rec_async)
 call unite#custom_action('cdable', 'rec_parent/async', s:cdable_action_rec_parent_async)
+call unite#custom_action('cdable', 'rec_project/async', s:cdable_action_rec_project_async)
 unlet! s:cdable_action_rec
 unlet! s:cdable_action_rec_async
+unlet! s:cdable_action_rec_project
+unlet! s:cdable_action_rec_project_async
+unlet! s:cdable_action_rec_parent
+unlet! s:cdable_action_rec_parent_async
 "}}}
 
 " Misc.

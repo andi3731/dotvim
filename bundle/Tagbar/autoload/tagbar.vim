@@ -53,6 +53,7 @@ let s:ctags_types         = {}
 
 let s:new_window      = 1
 let s:is_maximized    = 0
+let s:winrestcmd      = ''
 let s:short_help      = 1
 let s:nearby_disabled = 0
 
@@ -1867,8 +1868,10 @@ endfunction
 function! s:ZoomWindow() abort
     if s:is_maximized
         execute 'vert resize ' . g:tagbar_width
+        execute s:winrestcmd
         let s:is_maximized = 0
     else
+        let s:winrestcmd = winrestcmd()
         vert resize
         let s:is_maximized = 1
     endif
@@ -1911,11 +1914,13 @@ function! s:ProcessFile(fname, ftype) abort
         let typeinfo = fileinfo.typeinfo
         call fileinfo.reset()
     else
-        silent! execute 'doautocmd <nomodeline> TagbarProjects User ' . a:fname
-        if exists('b:tagbar_type')
-            let typeinfo = extend(copy(typeinfo),
-                                \ s:TransformUserTypeDef(b:tagbar_type))
-            call typeinfo.createKinddict()
+        if exists('#TagbarProjects#User')
+            execute 'doautocmd <nomodeline> TagbarProjects User ' . a:fname
+            if exists('b:tagbar_type')
+                let typeinfo = extend(copy(typeinfo),
+                                    \ s:TransformUserTypeDef(b:tagbar_type))
+                call typeinfo.createKinddict()
+            endif
         endif
         let fileinfo = s:FileInfo.New(a:fname, a:ftype, typeinfo)
     endif
@@ -1983,7 +1988,7 @@ function! s:ProcessFile(fname, ftype) abort
         call filter(fileinfo.tags, '!(' . is_scoped . ')')
 
         call s:AddScopedTags(scopedtags, processedtags, {}, 0,
-                           \ typeinfo, fileinfo)
+                           \ typeinfo, fileinfo, line('$'))
 
         if !empty(scopedtags)
             echoerr 'Tagbar: ''scopedtags'' not empty after processing,'
@@ -2057,7 +2062,7 @@ function! s:ExecuteCtagsOnFile(fname, realfname, typeinfo) abort
 
         " Include extra type definitions
         if has_key(a:typeinfo, 'deffile')
-            let ctags_args += ['--options=' . a:typeinfo.deffile]
+            let ctags_args += ['--options=' . expand(a:typeinfo.deffile)]
         endif
 
         let ctags_type = a:typeinfo.ctagstype
@@ -2148,12 +2153,16 @@ function! s:ParseTagline(part1, part2, typeinfo, fileinfo) abort
         " Remove all tabs that may illegally be in the value
         let val = substitute(strpart(field, delimit + 1), '\t', '', 'g')
         if len(val) > 0
-            let taginfo.fields[key] = val
+            if key == 'line' || key == 'column'
+                let taginfo.fields[key] = str2nr(val)
+            else
+                let taginfo.fields[key] = val
+            endif
         endif
     endfor
     " Needed for jsctags
     if has_key(taginfo.fields, 'lineno')
-        let taginfo.fields.line = taginfo.fields.lineno
+        let taginfo.fields.line = str2nr(taginfo.fields.lineno)
     endif
 
     " Make some information easier accessible
@@ -2198,7 +2207,7 @@ endfunction
 " Tagbar. Properly parsing them is quite tricky, so try not to think about it
 " too much.
 function! s:AddScopedTags(tags, processedtags, parent, depth,
-                        \ typeinfo, fileinfo) abort
+                        \ typeinfo, fileinfo, maxline) abort
     if !empty(a:parent)
         let curpath = a:parent.fullpath
         let pscope  = a:typeinfo.kind2scope[a:parent.fields.kind]
@@ -2216,7 +2225,9 @@ function! s:AddScopedTags(tags, processedtags, parent, depth,
         let is_cur_tag .= ' &&
         \ (v:val.path ==# curpath ||
          \ match(v:val.path, ''\V\^\C'' . curpath . a:typeinfo.sro) == 0) &&
-        \ (v:val.path ==# curpath ? (v:val.scope ==# pscope) : 1)'
+        \ (v:val.path ==# curpath ? (v:val.scope ==# pscope) : 1) &&
+        \ v:val.fields.line >= a:parent.fields.line &&
+        \ v:val.fields.line <= a:maxline'
     endif
 
     let curtags = filter(copy(a:tags), is_cur_tag)
@@ -2254,8 +2265,22 @@ function! s:AddScopedTags(tags, processedtags, parent, depth,
                 let tag.children = []
             endif
 
+            " Check for tags with the exact same name that may be created
+            " alternatively in a conditional (Issue #139). The only way to
+            " distinguish between them is by line number.
+            let twins = filter(copy(realtags),
+                             \ "v:val.fullpath ==# '" . tag.fullpath . "'" .
+                             \ " && v:val.fields.line != " . tag.fields.line)
+            let maxline = line('$')
+            for twin in twins
+                if twin.fields.line <= maxline &&
+                 \ twin.fields.line > tag.fields.line
+                    let maxline = twin.fields.line - 1
+                endif
+            endfor
+
             call s:AddScopedTags(a:tags, tag.children, tag, a:depth + 1,
-                               \ a:typeinfo, a:fileinfo)
+                               \ a:typeinfo, a:fileinfo, maxline)
         endfor
         call extend(a:processedtags, realtags)
 
@@ -2281,7 +2306,7 @@ function! s:AddScopedTags(tags, processedtags, parent, depth,
 
     if !empty(grandchildren)
         call s:AddScopedTags(a:tags, a:processedtags, a:parent, a:depth + 1,
-                           \ a:typeinfo, a:fileinfo)
+                           \ a:typeinfo, a:fileinfo, a:maxline)
     endif
 endfunction
 
@@ -2320,7 +2345,7 @@ function! s:ProcessPseudoChildren(tags, tag, depth, typeinfo, fileinfo) abort
         endif
 
         call s:AddScopedTags(a:tags, childtag.children, childtag, a:depth + 1,
-                           \ a:typeinfo, a:fileinfo)
+                           \ a:typeinfo, a:fileinfo, line('$'))
     endfor
 
     let is_grandchild = 'v:val.depth > a:depth &&
@@ -2328,7 +2353,7 @@ function! s:ProcessPseudoChildren(tags, tag, depth, typeinfo, fileinfo) abort
     let grandchildren = filter(copy(a:tags), is_grandchild)
     if !empty(grandchildren)
         call s:AddScopedTags(a:tags, a:tag.children, a:tag, a:depth + 1,
-                           \ a:typeinfo, a:fileinfo)
+                           \ a:typeinfo, a:fileinfo, line('$'))
     endif
 endfunction
 
