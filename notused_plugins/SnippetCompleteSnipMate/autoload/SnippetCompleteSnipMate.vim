@@ -42,8 +42,7 @@ function! s:SnippetToMatch( trigger, snippet )
 endfunction
 
 function! SnippetCompleteSnipMate#Generator()
-    "let l:snippets = GetSnipsInCurrentScope()
-    let l:snippets = UltiSnips_SnippetDict()
+    let l:snippets = GetSnipsInCurrentScope()
     return map(keys(l:snippets), 's:SnippetToMatch(v:val, l:snippets[v:val])')
 endfunction
 
