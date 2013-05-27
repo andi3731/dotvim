@@ -73,7 +73,7 @@ function! SetupVAM()
   VAMAddToActiveAddons ctrlp SmartusLine TaskList supertab
   VAMAddToActiveAddons d.0 Bufstop delimitMate CountJump
   VAMAddToActiveAddons ManPageView vimproc Tagbar tlib NrrwRgn
-  VAMAddToActiveAddons dispatch
+  VAMAddToActiveAddons dispatch UltiSnips
   "VAMAddToActiveAddons LaTeX-Box vlatex SpellCheck LanguageTool
   VAMAddToActiveAddons SnippetCompleteSnipMate SnippetComplete UltiSnips
   "VAMAddToActiveAddons yankstack
@@ -569,5 +569,9 @@ if g:neocomplcache_enable_at_startup == 1
   let g:neocomplcache_omni_patterns.perl = '\h\w*->\h\w*\|\h\w*::'
 endif
 "==============================================================================}}}
+
+function! GetSnipsInCurrentScope()
+  return UltiSnips_SnippetDict()
+endfunction
 
 " vim: foldmethod=marker
