@@ -553,7 +553,9 @@ class SnippetManager(object):
         # Sort snippets alphabetically
         snippets.sort(key=lambda x: x.trigger)
         for snip in snippets:
-            _vim.command("let g:current_ulti_dict['{key}'] = '{val}'".format(key=snip.trigger, val=snip.description))
+            description = snip.description[snip.description.find(snip.trigger) +
+                len(snip.trigger) +3:-1]
+            _vim.command("let g:current_ulti_dict['{key}'] = '{val}'".format(key=snip.trigger, val=description))
 
     @err_to_scratch_buffer
     def list_snippets(self):

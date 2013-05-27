@@ -2991,7 +2991,7 @@ class DeleteCurrentTabStop3_JumpAround(_VimTest):
 
 class VerifyVimDict1(_VimTest):
 
-    snippets = ('test', 'abc123')
+    snippets = ('testâ', 'abc123ά')
     keys = 'test=(type(UltiSnips_SnippetDict()) . len(UltiSnips_SnippetDict()))\n'
 
     wanted = 'test41'
