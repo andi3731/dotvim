@@ -1,5 +1,5 @@
 "=============================================================================
-" FILE: matcher_regexp.vim
+" FILE: neosnippet.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
 " Last Modified: 29 May 2013.
 " License: MIT license  {{{
@@ -27,66 +27,36 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#filters#matcher_regexp#define() "{{{
-  return s:matcher
-endfunction"}}}
-
-let s:matcher = {
-      \ 'name' : 'matcher_regexp',
-      \ 'description' : 'regular expression matcher',
+let s:source = {
+      \ 'name' : 'neosnippet',
+      \ 'kind' : 'keyword',
+      \ 'rank' : 8,
+      \ 'hooks' : {},
       \}
 
-function! s:matcher.filter(candidates, context) "{{{
-  if a:context.input == ''
-    return unite#filters#filter_matcher(
-          \ a:candidates, '', a:context)
-  endif
+function! s:source.hooks.on_init(context) "{{{
+  " Initialize.
+  call neosnippet#util#set_default(
+        \ 'g:neosnippet#enable_preview', 0)
+endfunction"}}}
 
-  let candidates = a:candidates
-  for input in a:context.input_list
-    let candidates = unite#filters#matcher_regexp#regexp_matcher(
-          \ candidates, input, a:context)
+function! s:source.gather_candidates(context) "{{{
+  let candidates = values(neosnippet#get_snippets())
+
+  for snippet in candidates
+    let snippet.dup = 1
+    let snippet.menu = neosnippet#util#strwidthpart(
+          \ snippet.menu_template, winwidth(0)/3)
+    if g:neosnippet#enable_preview
+      let snippet.info = snippet.snip
+    endif
   endfor
 
   return candidates
 endfunction"}}}
 
-function! unite#filters#matcher_regexp#regexp_matcher(candidates, input, context) "{{{
-  let expr = unite#filters#matcher_regexp#get_expr(a:input)
-
-  try
-    return unite#filters#filter_matcher(a:candidates, expr, a:context)
-  catch
-    return []
-  endtry
-endfunction"}}}
-function! unite#filters#matcher_regexp#get_expr(input) "{{{
-  let input = a:input
-
-  if input =~ '^!'
-    if input == '!'
-      return '1'
-    endif
-
-    " Exclusion match.
-    let expr = 'v:val.word !~ '.string(input[1:])
-  elseif input !~ '[~\\.^$\[\]*]'
-    if unite#util#has_lua()
-      let expr = 'if_lua'
-    else
-      " Optimized filter.
-      let input = substitute(input, '\\\(.\)', '\1', 'g')
-      let expr = &ignorecase ?
-            \ printf('stridx(tolower(v:val.word), %s) != -1',
-            \    string(tolower(input))) :
-            \ printf('stridx(v:val.word, %s) != -1',
-            \    string(input))
-    endif
-  else
-    let expr = 'v:val.word =~ '.string(input)
-  endif
-
-  return expr
+function! neocomplete#sources#neosnippet#define() "{{{
+  return s:source
 endfunction"}}}
 
 let &cpo = s:save_cpo
