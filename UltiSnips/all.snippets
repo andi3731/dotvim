@@ -2,7 +2,7 @@ snippet def "def"
 def ${1:${VISUAL:foo}}
 {${2}} ${3:{${4}}} ${5:{${6}}}
 $0
-endsnippet 
+endsnippet
 
 global !p
 def ins1(t1, t2):
@@ -13,8 +13,16 @@ snippet def2 "def"
 def ${1:${VISUAL:foo}}
 {${2}} `!p snip.rv=ins1(t[3], '{')`$3`!p snip.rv=ins1(t[3], '}')` `!p snip.rv=ins1(t[4], '{')`$4`!p snip.rv=ins1(t[4], '}')`
 $0
-endsnippet 
+endsnippet
 
-snippet testâ "abc123"
-xxxô
+snippet testâ "123êabc"
+abc123ά
+endsnippet
+
+snippet t'2 "string with  a radio"
+recol
+endsnippet
+
+snippet t"3 "no wonder"
+you suck
 endsnippet

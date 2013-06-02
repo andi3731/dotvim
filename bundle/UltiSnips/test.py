@@ -2990,11 +2990,39 @@ class DeleteCurrentTabStop3_JumpAround(_VimTest):
 # End: Normal mode editing  #}}}
 
 class VerifyVimDict1(_VimTest):
+    """check:
+    correct type (4 means vim dictionary)
+    correct length of dictionary (in this case we have on element if the use same prefix, dictionary should have 1 element)
+    correct description
+    if the prefix is mismatched no resulting dict should have 0 elements
+    """
 
-    snippets = ('testâ', 'abc123ά')
-    keys = 'test=(type(UltiSnips_SnippetDict()) . len(UltiSnips_SnippetDict()))\n'
+    snippets = ('testâ', 'abc123ά', '123êabc')
+    keys = ('test=(type(UltiSnips_SnippetDict()) . len(UltiSnips_SnippetDict()) . ' +
+       'UltiSnips_SnippetDict()["testâ"]' + ')\n' +
+       '=len(UltiSnips_SnippetDict())\n')
 
-    wanted = 'test41'
+    wanted = 'test41123êabc0'
+
+class VerifyVimDict2(_VimTest):
+    """check:
+    can use " in trigger
+    """
+
+    snippets = ('te"stâ', 'abc123ά', '123êabc')
+    akey = "'te{}stâ'".format('"')
+    keys = ('te"=(UltiSnips_SnippetDict()[{}]'.format(akey) + ')\n')
+    wanted = 'te"123êabc'
+
+class VerifyVimDict3(_VimTest):
+    """check:
+    can use ' in trigger
+    """
+
+    snippets = ("te'stâ", 'abc123ά', '123êabc')
+    akey = '"te{}stâ"'.format("'")
+    keys = ("te'=(UltiSnips_SnippetDict()[{}]".format(akey) + ')\n')
+    wanted = "te'123êabc"
 
 ###########################################################################
 #                               END OF TEST                               #

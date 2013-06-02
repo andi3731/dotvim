@@ -554,8 +554,20 @@ class SnippetManager(object):
         snippets.sort(key=lambda x: x.trigger)
         for snip in snippets:
             description = snip.description[snip.description.find(snip.trigger) +
-                len(snip.trigger) +3:-1]
-            _vim.command("let g:current_ulti_dict['{key}'] = '{val}'".format(key=snip.trigger, val=description))
+                len(snip.trigger) + 2:]
+
+            # the following makes it handle ' inside the trigger
+            key = as_unicode(snip.trigger)
+            description = as_unicode(description)
+
+            #check if the first and last elements of description are ' or " and if so remove them
+          # if len(description) > 2:
+          #   if description[0] == description[-1] and description[0] in ['"', "'"]:
+          #     pass
+          #   description = description[1:-1]
+
+            _vim.command(as_unicode("let g:current_ulti_dict['{key}'] = '{val}'").format(
+              key=key.replace("'", "''"), val=description))
 
     @err_to_scratch_buffer
     def list_snippets(self):
